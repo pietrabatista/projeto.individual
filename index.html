@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <title>ASTRO FALL</title> 
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script>
+        const height = document.documentElement.offsetHeight // Cria a tela do phaser na proporsão da tela sendo utilizada (altura).
+        const width = document.documentElement.offsetWidth // Cria a tela do phaser na proporsao da tela sendo utilizada (largura).
+        var config = { // Define e especifica as configurações do jogo.
+            type: Phaser.AUTO, // Tipo de renderização utilizada.
+            width: width, // Largura da área do jogo, definida em 'const' acima.
+            height: height, // Altura da área do jogo, definida em 'const' acima.
+            physics: { // Configura a física que será utilizada no jogo (gravidade).
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 325 }, // Gravidade afeta o eixo Y.
+                    debug: false // Desabilita a depuração. 
+                }
+            },
+
+            scene: {
+                preload: preload,
+                create: create,
+                update: update,
+            }
+        };
+
+        var game = new Phaser.Game(config); // Cria a instância do jogo.
+
+        // Minhas variáveis.
+        var plataforma;
+        var astronauta;
+        var teclado;
+        var estrela;
+        var meteoro;
+        var placar;
+        var pontuacao = 0;
+        var gameOver = false;
+        var preto;
+        var gameOverText;
+
+
+
+        function preload() { // Carrega os arquivos na máquina que serão utilizados na cena do jogo, como imagens e sons.
+            this.load.image('fundo', 'assets/space.png'); // carrega a imagem de fundo do jogo.
+            this.load.image('plataforma', 'assets/plataforma.jpg'); // Carrega a plataforma.
+            this.load.spritesheet('astronauta', 'assets/astronauta.png', { frameWidth: 32, frameHeight: 32}); // Carrega o astronauta.
+            this.load.image('meteoro', 'assets/pityIMG (1).png'); // Carrega o meteoro.
+            this.load.image('estrela', 'assets/star.png'); // Carrega a estrela.
+            this.load.image('preto', 'assets/preto.png'); // Carrega o fundo preto de Game Over.
+        };
+
+        function create() { // Adiciona/cria os elementos dentro do jogo e configura cada um deles.
+            this.add.image(width/2, height/2, 'fundo').setScale (width/500); // Adiciona a imagem de fundo no jogo e identifica a posição e escala de onde ficará na tela.
+        
+            plataforma = this.physics.add.staticGroup(); // Cria um grupo de platafomas que são afetadas pela física, estabelecendo um padrão para todas.
+
+            // Cria as plataformas no jogo, identificando a posição e a escala. O refreshBody atualiza o corpo da plataforma.
+            plataforma.create(100, height/1.5, 'plataforma').setScale(0.25).refreshBody();
+            plataforma.create(550, height/1.9, 'plataforma').setScale(0.25).refreshBody();
+            plataforma.create(770, 800, 'plataforma').setScale(width/1087).refreshBody();
+            plataforma.create(1400, height/2, 'plataforma').setScale(0.25).refreshBody();
+            plataforma.create(980, 550, 'plataforma').setScale(0.25).refreshBody();
+            plataforma.create(925, 200, 'plataforma').setScale(0.25).refreshBody();
+
+            
+            meteoro = this.physics.add.group(); // Cria um grupo de meteoros que terão o mesmo padrão.
+            this.time.addEvent({ // Cria um evento para os meteoros, após determinado tempo.
+                delay: 1500, // A cada 1.5 segundos, aparecerá um novo meteoro na tela.
+                callback: criarMeteoro, // 'Chama' a funçao 'criarMeteoro', definida no final do código.
+                callbackScope: this, 
+                loop: true }); // Define que o looping é verdadeiro. 
+
+            
+            estrela = this.physics.add.group(); // Cria um grupo de estrelas que terão o mesmo padrão.
+            this.time.addEvent({ // Cria um evento para as estrelas após determinado tempo.
+                delay: 1500, // A cada 1.5 segundos, aparecerá uma nova estrela na tela.
+                callback: criarEstrela, // 'Chama' a funçao 'criarEstrela', definida no final do código.
+                callbackScope: this,
+                loop: true }); // Define que o looping é verdadeiro.
+    
+            astronauta = this.physics.add.sprite(300, 450, 'astronauta').setScale(2); // Cria a sprite do astronauta na tela.
+            astronauta.setCollideWorldBounds(true); // Determina uma colisão, impedindo que o astronauta saia da tela.
+            this.physics.add.collider(astronauta, plataforma); // Adiciona a colisão entre o astronauta e as plataformas.
+            astronauta.setBounce(0.1); // Define que o astronauta quicará ao bater no 'chão'.
+
+            this.physics.add.overlap(astronauta, estrela, coletarEstrela); // Adiciona um overlap entre o astronauta e as estrelas, chamando a função 'coletarEstrelas'.
+            this.physics.add.overlap(astronauta, meteoro, hitBomb); // Adiciona um overlap entre o astronauta e os meteoros, chamando a função 'hitBomb'.
+
+            placar = this.add.text(50, 50, 'Estrelas: ' + pontuacao, { fontSize: '45px', fill: '#FFFFFF' }); // Cria um placar na tela do jogo.
+
+            teclado = this.input.keyboard.createCursorKeys(); // Reconhece as teclas que serão utlizadas no jogo - setas do computador.
+
+            // Cria a animação para o sprite do astronauta.
+            this.anims.create ({ 
+                key: 'esquerda', // Indica que essa animação será usada quando o astronauta se mover para a esquerda.
+                frames: this.anims.generateFrameNumbers('astronauta', { start: 3, end: 5}), // Define quais frames serão utilizados nessa animação.
+                frameRate: 10, // Velocidade da animação em frames por segundo.
+                repeat: -1 // Indica um loop.
+            });
+            
+            this.anims.create ({
+                key: 'frente', // Indica que essa animação será usada quando o astronauta estiver de frente.
+                frames: [{ key: 'astronauta', frame: 0}], // Define o frame que será utilizado.
+                frameRate: 20 
+            });
+
+            this.anims.create({
+                key: 'direita', // Indica que essa animação será usada quando o astronauta se mover para a direita.
+                frames: this.anims.generateFrameNumbers('astronauta', {start: 6, end: 8}), // Define quais frames serão utilizados nessa animação.
+                frameRate: 10, // Velocidade da animação em frames por segundo.
+                repeat: -1 // Indica um loop.
+            });
+
+            preto = this.add.image(width/2, height/2, 'preto'); // Adiciona a imagem preta que será utilizada no fim do jogo.
+            preto.setVisible(false); // Configura que a imagem estará, inicialmente, invisível.
+            preto.setDisplaySize(width, height); // Ajusta o tamanho da imagem para cobrir a tela inteira do jogo.
+
+            gameOverText = this.add.text(width / 2, height / 2, 'Game Over', { fontSize: '80px', fill: '#ffffff' }); // Adiciona a frase 'Game Over' na tela.
+            gameOverText.setVisible(false); // Configura que o texto estará, incialmente, invisível.
+
+            };
+
+
+        function update() { // Função chamada várias vezes para atualizar o jogo, especificamente o movimento do astronauta.
+            if (teclado.left.isDown) { // Verifica se a tecla de seta esquerda está pressionada.
+                astronauta.setVelocityX(-300); // Se estiver pressionada, define a velocidade do sprite no eixo X
+                astronauta.anims.play('esquerda', true); // Indica que o personagem está se movendo para a esquerda.
+            }
+            else if (teclado.right.isDown) { // Verifica se a tecla de seta direita está pressionada.
+                astronauta.setVelocityX(300); // Se estiver pressionada, define a velocidade do sprite no eixo X.
+                astronauta.anims.play('direita', true); // Indica que o personagem está se movendo para a direita.
+            }
+            else { astronauta.setVelocityX(0); // Se nenhuma das teclas horizontais estiverem pressionadas, a velocidade no eixo X é zero.
+                astronauta.anims.play('frente', true); } // Indica que a posição será de frente.
+            
+            if (teclado.up.isDown && astronauta.body.touching.down) { // Verifica se a tecla de seta para cima está pressionada e se o astronauta está tocando alguma superfície embaixo.
+                astronauta.setVelocityY(-350); // Se as condições forem verdadeiras, define a velocidade do astronauta no eixo Y. Como se estivesse pulando.
+            }
+
+            else {}
+            
+        };   
+            
+        function criarMeteoro() {
+            var x = Phaser.Math.Between(0, width); // Gera um valor X aleatório para o novo meteoro, dentro do limite da tela do jogo.
+            var meteoroNovo = meteoro.create(x, 0, 'meteoro'); // Cria um novo meteoro nessa posição X, no topo da tela (y=0).
+            meteoroNovo.setScale(0.09); // Define o tamanho do meteoro/
+            meteoroNovo.setVelocity(Phaser.Math.Between(-15, 15), Phaser.Math.Between(150, 200)); // Define uma velocidade aleatória no eixo X e no eixo Y.
+        };
+
+        
+        function criarEstrela() {
+            var x = Phaser.Math.Between(0, width); // Gera um valor aleatório no eixo X de onde a nova estrela será criada, dentro da tela do jogo.
+            var estrelaNova = estrela.create(x, 0, 'estrela'); // Usa a variável x para determinar a posição da nova estrela. Ela aparece no topo da tela.
+            estrelaNova.setScale(2); // Define o tamanho da estrela.
+            estrelaNova.setVelocity(Phaser.Math.Between(-15, 15), Phaser.Math.Between(150, 200)); // Define uma velocidade aleatória no eixo X e no eixo Y.
+        };
+
+        function coletarEstrela(astronauta, estrela) { // Função que define o que acontece quando o astronauta sobrepor uma estrela.
+            estrela.disableBody(true, true); // Interrompe a interação com a estrela e torna ela invisível.
+
+            pontuacao += 1; // Adiciona +1 pontos toda vez que o astronauta coletar uma estrela.
+            placar.setText('Estrelas:' + pontuacao); // Atualiza o placar para mostrar a quantidade de estrelas coletadas.
+        };   
+
+        function hitBomb (astronauta, meteoro) { // Define o que acontece com o astronauta quando colidir com o meteoro.
+            astronauta.anims.play('frente'); // Define que o astronauta fique de frente.
+            gameOver = true; // Define que o jogo acabou = Game Over.
+            preto.setVisible(true); // Torna o fundo preto visível.
+            gameOverText.setVisible(true); // Torna visível o texto 'Game Over'.
+            
+        };
+
+
+        </script>
+
+</body>
+
+</html>
